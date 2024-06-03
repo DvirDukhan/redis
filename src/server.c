@@ -57,6 +57,8 @@
 #define GNUC_VERSION_STR "0.0.0"
 #endif
 
+extern pthread_rwlock_t moduleGIL;
+
 /* Our shared "common" objects */
 
 struct sharedObjectsStruct shared;
@@ -2586,6 +2588,16 @@ void makeThreadKillable(void) {
 
 void initServer(void) {
     int j;
+
+    pthread_rwlockattr_t attr;
+    pthread_rwlockattr_init(&attr);
+
+#if !defined(__APPLE__) && !defined(__FreeBSD__)
+  int pref = PTHREAD_RWLOCK_PREFER_WRITER_NONRECURSIVE_NP;
+    pthread_rwlockattr_setkind_np(&attr, pref);
+#endif
+
+    pthread_rwlock_init(&moduleGIL, &attr);
 
     signal(SIGHUP, SIG_IGN);
     signal(SIGPIPE, SIG_IGN);

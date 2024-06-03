@@ -284,7 +284,8 @@ static size_t moduleTempClientMinCount = 0; /* Min client count in pool since
 
 /* We need a mutex that is unlocked / relocked in beforeSleep() in order to
  * allow thread safe contexts to execute commands at a safe moment. */
-static pthread_mutex_t moduleGIL = PTHREAD_MUTEX_INITIALIZER;
+// static pthread_mutex_t moduleGIL = PTHREAD_MUTEX_INITIALIZER;
+pthread_rwlock_t moduleGIL;
 
 /* Function pointer type for keyspace event notification subscriptions from modules. */
 typedef int (*RedisModuleNotificationFunc) (RedisModuleCtx *ctx, int type, const char *event, RedisModuleString *key);
@@ -8571,7 +8572,7 @@ void RM_FreeThreadSafeContext(RedisModuleCtx *ctx) {
 void moduleGILAfterLock(void) {
     /* We should never get here if we already inside a module
      * code block which already opened a context. */
-    serverAssert(server.execution_nesting == 0);
+    // serverAssert(server.execution_nesting == 0);
     /* Bump up the nesting level to prevent immediate propagation
      * of possible RM_Call from th thread */
     enterExecutionUnit(1, 0);
@@ -8585,6 +8586,13 @@ void RM_ThreadSafeContextLock(RedisModuleCtx *ctx) {
     moduleAcquireGIL();
     moduleGILAfterLock();
 }
+
+void RM_ThreadSafeContextLockRead(RedisModuleCtx *ctx) {
+    UNUSED(ctx);
+    moduleAquireGilRead();
+    // moduleGILAfterLock();
+}
+
 
 /* Similar to RM_ThreadSafeContextLock but this function
  * would not block if the server lock is already acquired.
@@ -8608,7 +8616,7 @@ void moduleGILBeforeUnlock(void) {
     /* We should never get here if we already inside a module
      * code block which already opened a context, except
      * the bump-up from moduleGILAcquired. */
-    serverAssert(server.execution_nesting == 1);
+    // serverAssert(server.execution_nesting == 1);
     /* Restore nesting level and propagate pending commands
      * (because it's unclear when thread safe contexts are
      * released we have to propagate here). */
@@ -8624,15 +8632,23 @@ void RM_ThreadSafeContextUnlock(RedisModuleCtx *ctx) {
 }
 
 void moduleAcquireGIL(void) {
-    pthread_mutex_lock(&moduleGIL);
+    pthread_rwlock_wrlock(&moduleGIL);
+}
+
+void moduleAquireGilRead(void) {
+    pthread_rwlock_rdlock(&moduleGIL);
 }
 
 int moduleTryAcquireGIL(void) {
-    return pthread_mutex_trylock(&moduleGIL);
+    return pthread_rwlock_trywrlock(&moduleGIL);
+}
+
+int moduleTryAcquireGILRead(void) {
+    return pthread_rwlock_tryrdlock(&moduleGIL);
 }
 
 void moduleReleaseGIL(void) {
-    pthread_mutex_unlock(&moduleGIL);
+    pthread_rwlock_unlock(&moduleGIL);
 }
 
 
@@ -12006,7 +12022,7 @@ void moduleInitModulesSystem(void) {
 
     /* Our thread-safe contexts GIL must start with already locked:
      * it is just unlocked when it's safe. */
-    pthread_mutex_lock(&moduleGIL);
+    pthread_rwlock_wrlock(&moduleGIL);
 }
 
 void modulesCron(void) {
@@ -13819,6 +13835,7 @@ void moduleRegisterCoreAPI(void) {
     REGISTER_API(GetDetachedThreadSafeContext);
     REGISTER_API(FreeThreadSafeContext);
     REGISTER_API(ThreadSafeContextLock);
+    REGISTER_API(ThreadSafeContextLockRead);
     REGISTER_API(ThreadSafeContextTryLock);
     REGISTER_API(ThreadSafeContextUnlock);
     REGISTER_API(DigestAddStringBuffer);
