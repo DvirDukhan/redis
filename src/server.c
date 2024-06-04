@@ -57,7 +57,6 @@
 #define GNUC_VERSION_STR "0.0.0"
 #endif
 
-extern pthread_rwlock_t moduleGIL;
 
 /* Our shared "common" objects */
 
@@ -68,6 +67,8 @@ struct sharedObjectsStruct shared;
  * at runtime to avoid strange compiler optimizations. */
 
 double R_Zero, R_PosInf, R_NegInf, R_Nan;
+
+pthread_rwlock_t moduleGIL;
 
 /*================================= Globals ================================= */
 
@@ -2598,7 +2599,7 @@ void initServer(void) {
 #endif
 
     pthread_rwlock_init(&moduleGIL, &attr);
-
+    printf("gil was init at %d\n", &moduleGIL);
     signal(SIGHUP, SIG_IGN);
     signal(SIGPIPE, SIG_IGN);
     setupSignalHandlers();

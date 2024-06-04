@@ -285,7 +285,7 @@ static size_t moduleTempClientMinCount = 0; /* Min client count in pool since
 /* We need a mutex that is unlocked / relocked in beforeSleep() in order to
  * allow thread safe contexts to execute commands at a safe moment. */
 // static pthread_mutex_t moduleGIL = PTHREAD_MUTEX_INITIALIZER;
-pthread_rwlock_t moduleGIL;
+// pthread_rwlock_t moduleGIL;
 
 /* Function pointer type for keyspace event notification subscriptions from modules. */
 typedef int (*RedisModuleNotificationFunc) (RedisModuleCtx *ctx, int type, const char *event, RedisModuleString *key);
@@ -8632,10 +8632,12 @@ void RM_ThreadSafeContextUnlock(RedisModuleCtx *ctx) {
 }
 
 void moduleAcquireGIL(void) {
+    printf("locking module gil at %d\n", &moduleGIL );
     pthread_rwlock_wrlock(&moduleGIL);
 }
 
 void moduleAquireGilRead(void) {
+    printf("locking module gil at %d\n", &moduleGIL );
     pthread_rwlock_rdlock(&moduleGIL);
 }
 
@@ -8648,6 +8650,7 @@ int moduleTryAcquireGILRead(void) {
 }
 
 void moduleReleaseGIL(void) {
+    printf("unlocking gil at %d\n", &moduleGIL);
     pthread_rwlock_unlock(&moduleGIL);
 }
 
